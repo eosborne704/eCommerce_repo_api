@@ -1,24 +1,36 @@
+"""
+Views for ecommerce
+"""
+import secrets
+from datetime import datetime, timedelta
+from hashlib import sha1
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User, Group
 from django.contrib.auth import login
 from django.http import HttpResponseRedirect, HttpResponse
+from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.core.mail import EmailMessage
 from django.utils import timezone
 from .models import Product, Store, Review, ResetToken
 from .forms import ProductsForm, StoreForm, ReviewForm
-import secrets
 
 
 Vendors, created = Group.objects.get_or_create(name='Vendors')
 
+
 def verify_username(username):
-    from django.contrib.auth.models import User
+    """
+    Checks if username exists in database.
+    """
     return not User.objects.filter(username=username).exists()
 
 
 def verify_password(password):
+    """
+    Checks if password is at least 8.
+    """
     return len(password) >= 8
 
 
@@ -61,6 +73,9 @@ def welcome_view(request):
 
 
 def welcome(request):
+    """
+    Render the welcome page template.
+    """
     return render(request, 'welcome.html')
 
 
@@ -68,7 +83,6 @@ def all_stores(request):
     """
     Displays all presently-created stores
     """
-
     stores = Store.objects.all()
     context = {
         "stores": stores,
@@ -76,30 +90,27 @@ def all_stores(request):
     }
     return render(request, "storefront/all_stores.html", context)
 
-def view_product_page(request):
-    user = request.user
 
-    # Check if the user has the 'view_product' permission for the eCommerce app
+def view_product_page(request):
+    """
+    Show product page if user permitted.
+    """
+    user = request.user
     if user.has_perm('eCommerce.view_product'):
         product_name = request.POST['product']
         product = Product.objects.get(name=product_name)
-
-        # If they have permission, render the product page with the product data
         return render(request, 'product_page.html', {'product': product})
 
 
 def change_product_price(request):
+    """
+    Change product price if permitted.
+    """
     user = request.user
-
-    # Check if the user has permission to change products in the eCommerce app
     if user.has_perm('eCommerce.change_product'):
         product = request.POST.get('product')
         new_price = request.POST.get('new_price')
-
-        # Call a function to update the price (e.g., set_new_price)
         Product.objects.filter(name=product).update(price=new_price)
-
-        # Redirect the user back to the product list after a successful change
         return HttpResponseRedirect(reverse('eCommerce:products'))
 
 
@@ -111,7 +122,6 @@ def create_store(request):
     if request.method == "POST":
         form = StoreForm(request.POST)
         if form.is_valid():
-            store = form.save(commit=False)
             form.save()
             return redirect("all_stores")
     else:
@@ -137,8 +147,7 @@ def edit_store_details(request, pk):
     if request.method == "POST":
         form = StoreForm(request.POST, instance=store)
         if form.is_valid():
-            store = form.save(commit=False)
-            store.save()
+            form.save()
             return redirect("all_stores")
 
     else:
@@ -157,9 +166,7 @@ def delete_store(request, pk):
 
 def all_products(request, store_id):
     """
-    Docstring for view_notes
-
-    :param request: Description
+    Show all products for a store.
     """
     store = get_object_or_404(Store, pk=store_id)
     products = Product.objects.filter(store=store)
@@ -196,10 +203,7 @@ def add_product(request, store_id):
 
 def view_product(request, pk):
     """
-    Docstring for view_notes
-
-    :param request: Description
-    :param pk: Description
+    Show details for a product.
     """
     product = get_object_or_404(Product, pk=pk)
     store = product.store
@@ -215,8 +219,7 @@ def edit_product_details(request, pk):
     if request.method == "POST":
         form = ProductsForm(request.POST, instance=product)
         if form.is_valid():
-            product = form.save(commit=False)
-            product.save()
+            form.save()
             return redirect("view_product", pk=product.pk)
 
     else:
@@ -313,7 +316,7 @@ def delete_review(request, pk):
 
 def send_password_reset(request):
     """
-    password reset logic
+    Send password reset email to user.
     """
     user_email = request.POST.get('email')
     try:
@@ -342,17 +345,18 @@ def send_password_reset(request):
         return HttpResponse("Email not found.")
 
 
+@require_POST
 @login_required
 def add_item_to_cart(request):
+    """
+    Add an item to user cart.
+    """
     session = request.session
     item_name = request.POST.get('item') # The product name from your form
     quantity = int(request.POST.get('quantity', 1))
 
     # Find the product in the database
-    try:
-        product = Product.objects.get(title=item_name)
-    except Product.DoesNotExist:
-        return HttpResponse("Product not found.")
+    product = Product.objects.get(title=item_name)
 
     # Check if enough inventory is available
     if product.inventory < quantity:
@@ -368,11 +372,78 @@ def add_item_to_cart(request):
     else:
         session['cart'] = {item_name: quantity}
 
-    session.modified = True
-    return redirect('show_user_cart')
+        session.modified = True
+        return redirect('show_user_cart')
 
+@require_POST
+@login_required
+def empty_cart(request):
+    """
+    Remove all items from the user's cart.
+    """
+    if 'cart' in request.session:
+        del request.session['cart']
+        request.session.modified = True
+    return redirect('show_user_cart')
 
 @login_required
 def show_user_cart(request):
+    """
+    Display the current user's shopping cart.
+    """
     cart = request.session.get('cart', {})
     return render(request, 'main_cart.html', {'cart': cart})
+
+
+@require_POST
+@login_required
+def checkout_view(request):
+    """
+    Checks out cart items
+    """
+    if 'cart' in request.session:
+        del request.session['cart']
+        request.session.modified = True
+    return HttpResponse('Checkout complete!')
+
+
+def retreive_products(request):
+    """
+    Get all products in user cart.
+    """
+    products = []
+    session = request.session
+    if 'cart' in session:
+        for data in session['cart'].items():
+            name, quantity = data
+            product = Product.objects.get(name=name)
+            products.append({product, quantity})
+    return products
+
+
+def build_email(user, reset_url):
+    """
+    Builds reset email
+    """
+    subject = "Password Reset"
+    user_email = user.email
+    domain_email = "example@domain.com"
+    body = f"Hi {user.username},\nHere is your link to reset your password: {reset_url}"
+    email = EmailMessage(subject, body, domain_email, [user_email])
+    return email
+
+
+def generate_reset_url(user):
+    """
+    Produces reset url
+    """
+    domain = "http://127.0.0.1:8000/"
+    app_name = "grabmore"
+    url = f"{domain}{app_name}/reset_password/"
+    token = str(secrets.token_urlsafe(16))
+    expiry_date = datetime.now() + timedelta(minutes=5)
+    reset_token = ResetToken.objects.create(user=user,
+    token=sha1(token.encode()).hexdigest(),
+    expiry_date=expiry_date)
+    url += f"{token}/"
+    return url

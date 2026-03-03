@@ -22,4 +22,15 @@
 </table>
 
 <br>
+<form action="{% url 'empty_cart' %}" method="post" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit">Empty Cart</button>
+</form>
+
+<form action="{% url 'checkout' %}" method="post" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit">Checkout</button>
+</form>
+
+<br><br>
 <a href="{% url 'home' %}">Back to Shop</a>
