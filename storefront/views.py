@@ -72,13 +72,6 @@ def welcome_view(request):
     return render(request, 'welcome.html')
 
 
-def welcome(request):
-    """
-    Render the welcome page template.
-    """
-    return render(request, 'welcome.html')
-
-
 def all_stores(request):
     """
     Displays all presently-created stores
