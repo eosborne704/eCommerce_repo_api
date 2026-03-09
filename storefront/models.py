@@ -1,6 +1,14 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
+
+class Purchase(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    product = models.ForeignKey('Product', on_delete=models.CASCADE)
+    date_purchased = models.DateTimeField(auto_now_add=True)
+    quantity = models.PositiveIntegerField(default=1)
+    def __str__(self):
+        return f"{self.user} bought {self.product}"
 # Create your models here.
 
 class Store(models.Model):
@@ -9,9 +17,10 @@ class Store(models.Model):
     """
     title = models.CharField(max_length=200)
     blurb = models.TextField()
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='stores', help_text='Vendor who owns this store', null=True, blank=True)
 
     def __str__(self):
-        return str(self.title)
+        return self.title
 
 class Product(models.Model):
     """

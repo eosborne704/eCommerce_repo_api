@@ -14,7 +14,7 @@ class StoreForm(forms.ModelForm):
         Fields for writing and editing
         """
         model = Store
-        fields = ["title", "blurb"]
+        fields = ["title", "blurb"]  # owner will be set in view, not exposed in form
 
 class ProductsForm(forms.ModelForm):
     """

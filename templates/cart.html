@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2>Your Shopping Cart</h2>
+    {% if cart_items %}
+        <ul>
+            {% for item in cart_items %}
+                <li>{{ item.product.title }} &times; {{ item.quantity }} — ${{ item.product.price|floatformat:2 }} each</li>
+            {% endfor %}
+        </ul>
+        <h4>Total: ${{ total|floatformat:2 }}</h4>
+        <a class="btn btn-danger" href="/cart/empty/">Empty Cart</a>
+        <form action="/cart/checkout/" method="POST" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">Checkout</button>
+        </form>
+        {% if cart_items %}
+            <a class="btn btn-info mt-2" href="{% url 'view_store' pk=cart_items.0.product.store.pk %}">Return to Store</a>
+        {% endif %}
+    {% else %}
+        <p>Your cart is empty.</p>
+    {% endif %}
+</div>
+{% endblock %}

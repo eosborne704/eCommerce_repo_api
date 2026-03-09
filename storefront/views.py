@@ -1,23 +1,93 @@
-"""
-Views for ecommerce
-"""
+from django.db import models
 import secrets
 from datetime import datetime, timedelta
 from hashlib import sha1
 from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User, Group
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.http import HttpResponseRedirect, HttpResponse
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 from django.core.mail import EmailMessage
 from django.utils import timezone
-from .models import Product, Store, Review, ResetToken
+from .models import Product, Store, Review, ResetToken, Purchase
+from .forms import ProductsForm, StoreForm, ReviewForm
+
+@login_required
+def edit_product_details(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    store = product.store
+    # Only allow the owner (vendor) to edit products in their store
+    if not (request.user.is_authenticated and store.owner == request.user):
+        return HttpResponse("Unauthorized", status=403)
+    if request.method == "POST":
+        form = ProductsForm(request.POST, instance=product)
+        if form.is_valid():
+            form.save()
+            return redirect("view_product", pk=product.pk)
+    else:
+        form = ProductsForm(instance=product)
+    return render(request, "storefront/edit_product_details.html", {"form": form, "product": product})
+
+@login_required
+def delete_product(request, pk):
+    product = get_object_or_404(Product, pk=pk)
+    store = product.store
+    # Only allow the owner (vendor) to delete products in their store
+    if not (request.user.is_authenticated and store.owner == request.user):
+        return HttpResponse("Unauthorized", status=403)
+    if request.method == "POST":
+        product.delete()
+        return redirect("view_store", pk=store.pk)
+    return render(request, "storefront/delete_product.html", {"product": product})
+
+@login_required
+def delete_store(request, pk):
+    store = get_object_or_404(Store, pk=pk)
+    # Only allow the owner (vendor) to delete their store
+    if not (request.user.is_authenticated and store.owner == request.user):
+        return HttpResponse("Unauthorized", status=403)
+    if request.method == "POST":
+        store.delete()
+        return redirect("all_stores")
+    return render(request, "storefront/delete_store.html", {"store": store})
+from django.db import models
+import secrets
+from datetime import datetime, timedelta
+from hashlib import sha1
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth import authenticate
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User, Group
+from django.contrib.auth import login, logout
+from django.http import HttpResponseRedirect, HttpResponse
+from django.views.decorators.http import require_POST
+from django.urls import reverse
+from django.core.mail import EmailMessage
+from django.utils import timezone
+from .models import Product, Store, Review, ResetToken, Purchase
 from .forms import ProductsForm, StoreForm, ReviewForm
 
 
-Vendors, created = Group.objects.get_or_create(name='Vendors')
+def logout_view(request):
+    logout(request)
+    return redirect('login')
+
+def login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            # Redirect all users to stores page immediately
+            return redirect('all_stores')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'login.html', {'form': form})
 
 
 def verify_username(username):
@@ -34,22 +104,58 @@ def verify_password(password):
     return len(password) >= 8
 
 
+
 def register_user(request):
+    """
+    Allows users to register themselves
+    as either a Vendor or Buyer.
+    """
     if request.method == 'POST':
         uname = request.POST.get('username')
+        email = request.POST.get('email')
         pword = request.POST.get('password')
-        # This matches the 'name' attribute in your HTML <select> or <input>
+        confirm_pword = request.POST.get('confirm_password')
         role = request.POST.get('role')
-
+        valid_roles = ['Vendor', 'Buyer']
+        if role not in valid_roles:
+            return render(request, 'register.html', {
+                'error': 'Invalid role selected.',
+                'username': uname,
+                'email': email,
+                'role': role
+            })
+        if User.objects.filter(username=uname).exists():
+            return render(request, 'register.html', {
+                'error': 'Username already taken. Please choose another.',
+                'username': uname,
+                'email': email,
+                'role': role
+            })
+        if pword != confirm_pword:
+            return render(request, 'register.html', {
+                'error': 'Passwords do not match. Please make sure you have entered the right password both times.',
+                'username': uname,
+                'email': email,
+                'role': role
+            })
+        # Always ensure both groups exist
+        vendor_group, _ = Group.objects.get_or_create(name='Vendor')
+        buyer_group, _ = Group.objects.get_or_create(name='Buyer')
         user = User.objects.create_user(username=uname, password=pword)
-
-        group = Group.objects.get(name=role)
-        user.groups.add(group)
-
+        if role == 'Vendor':
+            user.groups.add(vendor_group)
+        elif role == 'Buyer':
+            user.groups.add(buyer_group)
         user.save()
+        # Confirm correct group assignment
+        if not user.groups.filter(name=role).exists():
+            return render(request, 'register.html', {
+                'error': f'{role} registration failed.',
+                'username': uname,
+                'role': role
+            })
         login(request, user)
-        return redirect('home') # Or wherever your home page is
-
+        return redirect('home')
     return render(request, 'register.html')
 
 
@@ -64,26 +170,31 @@ def change_user_password(username, new_password):
     user.save()
 
 
-@login_required(login_url='/grabsomore/alter_login/')
+@login_required
 def welcome_view(request):
     """
     Renders the welcome page
     """
-    return render(request, 'welcome.html')
+    stores = Store.objects.all()
+    return render(request, 'welcome.html', {"stores": stores})
 
 
 def all_stores(request):
     """
     Displays all presently-created stores
     """
+    is_vendor = False
     stores = Store.objects.all()
+    if request.user.is_authenticated:
+        is_vendor = request.user.groups.filter(name='Vendor').exists()
+        if is_vendor:
+            stores = Store.objects.filter(owner=request.user)
     context = {
         "stores": stores,
         "store_display": "All Stores",
+        "is_vendor": is_vendor,
     }
     return render(request, "storefront/all_stores.html", context)
-
-
 def view_product_page(request):
     """
     Show product page if user permitted.
@@ -115,7 +226,9 @@ def create_store(request):
     if request.method == "POST":
         form = StoreForm(request.POST)
         if form.is_valid():
-            form.save()
+            store = form.save(commit=False)
+            store.owner = request.user
+            store.save()
             return redirect("all_stores")
     else:
         form = StoreForm()
@@ -128,7 +241,10 @@ def view_store(request, pk):
     specific store
     """
     store = get_object_or_404(Store, pk=pk)
-    return render(request, "storefront/view_store.html", {"store": store})
+    is_vendor = False
+    if request.user.is_authenticated:
+        is_vendor = request.user.groups.filter(name='Vendor').exists()
+    return render(request, "storefront/view_store.html", {"store": store, "is_vendor": is_vendor})
 
 
 @login_required
@@ -137,12 +253,14 @@ def edit_store_details(request, pk):
     View to edit a note
     """
     store = get_object_or_404(Store, pk=pk)
+    # Only allow the owner (vendor) to edit their store
+    if not (request.user.is_authenticated and store.owner == request.user):
+        return HttpResponse("Unauthorized", status=403)
     if request.method == "POST":
         form = StoreForm(request.POST, instance=store)
         if form.is_valid():
             form.save()
             return redirect("all_stores")
-
     else:
         form = StoreForm(instance=store)
     return render(request, "storefront/create_store.html", {"form": form})
@@ -153,7 +271,7 @@ def delete_store(request, pk):
     """
     View to delete a product
     """
-    store = get_object_or_404(Store, pk=pk)
+    store = get_object_or_400(Store, pk=pk)
     store.delete()
 
 
@@ -178,6 +296,9 @@ def add_product(request, store_id):
     View to write a new sticky note
     """
     store = get_object_or_404(Store, pk=store_id)
+    # Only allow the owner (vendor) to add products to their store
+    if not (request.user.is_authenticated and store.owner == request.user):
+        return HttpResponse("Unauthorized", status=403)
     if request.method == "POST":
         form = ProductsForm(request.POST, request.FILES)
         if form.is_valid():
@@ -194,13 +315,56 @@ def add_product(request, store_id):
     return render(request, "storefront/add_product.html", {"form": form, "store": store})
 
 
+def get_rating_phrase_and_color(rating):
+    if rating >= 4.5:
+        return "Overwhelmingly positive!", "#50C878"  # emerald green
+    elif rating >= 4.0:
+        return "Very Positive!", "#66FF66"  # slightly brighter green
+    elif rating >= 3.5:
+        return "Fairly Positive!", "#99FF00"  # lime green
+    elif rating >= 3.0:
+        return "Decent", "#FFFF00"  # yellow
+    elif rating >= 2.5:
+        return "Fairly Negative", "#FFD700"  # orange-yellow
+    elif rating >= 2.0:
+        return "Very Negative", "#FF4500"  # orange-red
+    elif rating >= 1.0:
+        return "Overwhelmingly negative", "#B22222"  # slightly darker red
+    elif rating > 0:
+        return "Unusable", "#000000"  # black
+    else:
+        return "No ratings yet", "#888888"
+
 def view_product(request, pk):
     """
     Show details for a product.
     """
     product = get_object_or_404(Product, pk=pk)
     store = product.store
-    return render(request, "storefront/view_product.html", {"product": product, "store": store})
+    reviews = Review.objects.filter(product=product)
+    avg_rating = reviews.aggregate(models.Avg('rating'))['rating__avg'] or 0
+    phrase, color = get_rating_phrase_and_color(avg_rating)
+    # Annotate each review with phrase and color
+    annotated_reviews = []
+    for review in reviews:
+        r_phrase, r_color = get_rating_phrase_and_color(review.rating)
+        annotated_reviews.append({
+            'review': review,
+            'phrase': r_phrase,
+            'color': r_color,
+        })
+    is_buyer = False
+    if request.user.is_authenticated:
+        is_buyer = request.user.groups.filter(name='Buyer').exists()
+    return render(request, "storefront/view_product.html", {
+        "product": product,
+        "store": store,
+        "reviews": annotated_reviews,
+        "avg_rating": avg_rating,
+        "avg_phrase": phrase,
+        "avg_color": color,
+        "is_buyer": is_buyer,
+    })
 
 
 @login_required
@@ -265,8 +429,7 @@ def write_review(request, product_id):
             review = form.save(commit=False)
             review.product = product
             # Check if user has bought the product
-            cart = request.session.get('cart', {})
-            user_has_bought = str(product.title) in cart
+            user_has_bought = Purchase.objects.filter(user=request.user, product=product).exists()
             review.verified = user_has_bought
             review.save()
             return redirect("all_reviews", product_id=product.pk)
@@ -344,12 +507,18 @@ def add_item_to_cart(request):
     """
     Add an item to user cart.
     """
+    # Only allow buyers to add to cart
+    if not request.user.groups.filter(name='Buyer').exists():
+        return HttpResponse("Only buyers can add items to cart.")
     session = request.session
     item_name = request.POST.get('item') # The product name from your form
     quantity = int(request.POST.get('quantity', 1))
 
     # Find the product in the database
-    product = Product.objects.get(title=item_name)
+    try:
+        product = Product.objects.get(title=item_name)
+    except Product.DoesNotExist:
+        return render(request, "product_not_found.html", status=404)
 
     # Check if enough inventory is available
     if product.inventory < quantity:
@@ -364,9 +533,8 @@ def add_item_to_cart(request):
         session['cart'][item_name] = quantity
     else:
         session['cart'] = {item_name: quantity}
-
-        session.modified = True
-        return redirect('show_user_cart')
+    session.modified = True
+    return redirect('show_user_cart')
 
 @require_POST
 @login_required
@@ -374,30 +542,53 @@ def empty_cart(request):
     """
     Remove all items from the user's cart.
     """
+    # Only allow buyers to empty cart
+    if not request.user.groups.filter(name='Buyer').exists():
+        return HttpResponse("Only buyers can empty cart.")
     if 'cart' in request.session:
         del request.session['cart']
         request.session.modified = True
     return redirect('show_user_cart')
 
+total = 0
 @login_required
 def show_user_cart(request):
     """
     Display the current user's shopping cart.
     """
+    # Only allow buyers to view cart
+    if not request.user.groups.filter(name='Buyer').exists():
+        return HttpResponse("Only buyers can view cart.")
     cart = request.session.get('cart', {})
-    return render(request, 'main_cart.html', {'cart': cart})
+    cart_items = []
+    total = 0
+    for item, quantity in cart.items():
+        try:
+            product = Product.objects.get(title=item)
+            cart_items.append({'product': product, 'quantity': quantity})
+            total += product.price * quantity
+        except Product.DoesNotExist:
+            continue
+    return render(request, 'cart.html', {'cart_items': cart_items, 'total': total})
 
 
-@require_POST
 @login_required
 def checkout_view(request):
     """
     Checks out cart items
     """
+    cart = request.session.get('cart', {})
+    user = request.user
+    for item, quantity in cart.items():
+        try:
+            product = Product.objects.get(title=item)
+            Purchase.objects.create(user=user, product=product, quantity=quantity)
+        except Product.DoesNotExist:
+            continue
     if 'cart' in request.session:
         del request.session['cart']
         request.session.modified = True
-    return HttpResponse('Checkout complete!')
+    return render(request, 'storefront/checkout_complete.html')
 
 
 def retreive_products(request):

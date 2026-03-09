@@ -16,17 +16,14 @@ main {
 ul {
     list-style-type: none;
     padding: 0;
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
 }
-.card {
-  background-color: yellow;
-  border: 2px solid black;
-  margin: 20px;
-}
-
 li {
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    display: inline;
 }
-
 img {
   height: auto;
   width: auto;

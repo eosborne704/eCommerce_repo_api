@@ -17,12 +17,37 @@
                         <p class="card-text lead">{{ store.blurb }}</p>
                     </div>
                 </div>
-                <div class="d-grid gap-2">
-                    <a class="btn btn-warning" href="{% url 'edit_store_details' pk=store.pk %}">Edit Store Details</a>
-                    <a class="btn btn-danger" href="{% url 'delete_store' pk=store.pk %}">Delete Store</a>
-                    <a class="btn btn-primary" href="{% url 'all_products' store_id=store.pk %}">All Products</a>
+                <div class="d-grid gap-2 mb-4">
+                    {% if is_vendor and store.owner == user %}
+                        <a class="btn btn-success" href="{% url 'create_store' %}">Create Store</a>
+                        <a class="btn btn-warning" href="{% url 'edit_store_details' pk=store.pk %}">Edit Store Details</a>
+                        <a class="btn btn-danger" href="{% url 'delete_store' pk=store.pk %}">Delete Store</a>
+                        <a class="btn btn-primary" href="{% url 'add_product' store_id=store.pk %}">Add Product</a>
+                    {% endif %}
+
                     <a class="btn btn-secondary" href="{% url 'all_stores' %}">Back to Main Store Page</a>
                 </div>
+                <h4>Products in this Store:</h4>
+                <ul class="list-unstyled">
+                    {% for product in store.product_set.all %}
+                        <li class="mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <a class="card-title h5" href="{% url 'view_product' pk=product.pk %}">{{ product.title }}</a>
+                                    <p class="card-text">{{ product.content }}</p>
+                                    <p class="card-text">Price: ${{ product.price }}</p>
+                                    <p class="card-text">Inventory: {{ product.inventory }}</p>
+                                    {% if is_vendor and store.owner == user %}
+                                        <a class="btn btn-warning btn-sm mt-2" href="{% url 'edit_product_details' pk=product.pk %}">Edit</a>
+                                        <a class="btn btn-danger btn-sm mt-2" href="{% url 'delete_product' pk=product.pk %}">Delete</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </li>
+                    {% empty %}
+                        <li>No products yet.</li>
+                    {% endfor %}
+                </ul>
             </div>
         </div>
     </div>

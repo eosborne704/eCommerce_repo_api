@@ -1,20 +1,29 @@
 <h2>Create your Account</h2>
+{% if error %}
+    <div style="color: red; font-weight: bold; margin-bottom: 10px;">{{ error }}</div>
+{% endif %}
 <form method="POST">
     {% csrf_token %}
     <label>Username:</label>
-    <input type="text" name="username" required><br>
+    <input type="text" name="username" required value="{{ username|default:'' }}"><br>
 
     <label>Email:</label>
-    <input type="email" name="email" required><br>
+    <input type="email" name="email" required value="{{ email|default:'' }}"><br>
 
     <label>Password:</label>
     <input type="password" name="password" required><br>
 
+    <label>Confirm Password:</label>
+    <input type="password" name="confirm_password" required><br>
+
     <label>Join as:</label>
     <select name="role">
-        <option value="Customers">Buyer</option>
-        <option value="Vendors">Vendor</option>
+        <option value="Buyer" {% if role == 'Buyer' %}selected{% endif %}>Buyer</option>
+        <option value="Vendor" {% if role == 'Vendor' %}selected{% endif %}>Vendor</option>
     </select><br>
 
     <button type="submit">Sign Up</button>
+    <div style="margin-top: 10px;">
+        <a href="/login/" style="color: #007bff; text-decoration: underline;">Return to Login</a>
+    </div>
 </form>

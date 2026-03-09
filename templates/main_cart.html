@@ -1,33 +1,5 @@
-<h2>Your Shopping Cart</h2>
-
-<table border="1">
-    <thead>
-        <tr>
-            <th>Item Name</th>
-            <th>Quantity</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for name, qty in cart.items %}
-        <tr>
-            <td>{{ name }}</td>
-            <td>{{ qty }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="2">Your cart is empty!</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<br>
-<form action="{% url 'empty_cart' %}" method="post" style="display:inline;">
-    {% csrf_token %}
-    <button type="submit">Empty Cart</button>
-</form>
-
-<form action="{% url 'checkout' %}" method="post" style="display:inline;">
+<!-- This template is deprecated. Use cart.html instead. -->
+<form action="/cart/checkout/" method="POST" style="display:inline;">
     {% csrf_token %}
     <button type="submit">Checkout</button>
 </form>

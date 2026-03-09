@@ -2,10 +2,12 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('welcome/', views.welcome_view, name='home'),
+    path('', views.welcome_view, name='home'),
     path('register/', views.register_user, name='register'),
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
     # Store URLs
-    path("", views.all_stores, name="all_stores"),
+    path('stores/', views.all_stores, name='all_stores'),
     path("store/new/", views.create_store, name="create_store"),
     path("store/<int:pk>/", views.view_store, name="view_store"),
     path("store/<int:pk>/edit-store/", views.edit_store_details, name="edit_store_details"),
@@ -15,7 +17,8 @@ urlpatterns = [
     path("store/<int:store_id>/all-products/", views.all_products, name="all_products"),
     path("store/<int:store_id>/add-product/", views.add_product, name="add_product"),
     path("product/<int:pk>/", views.view_product, name="view_product"),
-    # Uncomment and implement these if you add edit/delete product views
+    # Review URLs
+    path('product/<int:product_id>/all-reviews/', views.all_reviews, name='all_reviews'),
     path("product/<int:pk>/edit/", views.edit_product_details, name="edit_product_details"),
     path("product/<int:pk>/delete/", views.delete_product, name="delete_product"),
 
