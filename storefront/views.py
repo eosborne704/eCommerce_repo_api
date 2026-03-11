@@ -131,6 +131,13 @@ def register_user(request):
                 'email': email,
                 'role': role
             })
+        if User.objects.filter(email=email).exists():
+            return render(request, 'register.html', {
+                'error': 'Email already registered. Please use a different email.',
+                'username': uname,
+                'email': email,
+                'role': role
+            })
         if pword != confirm_pword:
             return render(request, 'register.html', {
                 'error': 'Passwords do not match. Please make sure you have entered the right password both times.',
@@ -250,7 +257,7 @@ def view_store(request, pk):
 @login_required
 def edit_store_details(request, pk):
     """
-    View to edit a note
+    View to edit store details
     """
     store = get_object_or_404(Store, pk=pk)
     # Only allow the owner (vendor) to edit their store
@@ -293,7 +300,7 @@ def all_products(request, store_id):
 @login_required
 def add_product(request, store_id):
     """
-    View to write a new sticky note
+    View to add a new product
     """
     store = get_object_or_404(Store, pk=store_id)
     # Only allow the owner (vendor) to add products to their store
@@ -370,7 +377,7 @@ def view_product(request, pk):
 @login_required
 def edit_product_details(request, pk):
     """
-    View to edit a note
+    View to edit product details
     """
     product = get_object_or_404(Product, pk=pk)
     if request.method == "POST":

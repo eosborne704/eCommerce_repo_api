@@ -11,11 +11,10 @@
 {% block content %}
     <h2>
         {% if form.instance.pk %}
-            Edit
+            Edit Store
         {% else %}
-            Write
+            Create Store
         {% endif %}
-        note
     </h2>
     <form method="post"
         action="{% if form.instance.pk %}{% url 'edit_store_details' pk=form.instance.pk %}{% else %}{% url 'create_store' %}{% endif %} ">

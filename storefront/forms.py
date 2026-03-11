@@ -7,11 +7,11 @@ from .models import Product, Store, Review
 
 class StoreForm(forms.ModelForm):
     """
-    Form for writing and editing notes
+    Form for creating and editing stores
     """
     class Meta:
         """
-        Fields for writing and editing
+        Store fields
         """
         model = Store
         fields = ["title", "blurb"]  # owner will be set in view, not exposed in form

@@ -5,11 +5,10 @@
 {% block content %}
     <h2>
         {% if form.instance.pk %}
-            Edit
+            Edit Product
         {% else %}
-            Write
+            Add Product
         {% endif %}
-        note
     </h2>
     <form method="post" enctype="multipart/form-data"
         action="{% if form.instance.pk %}{% url 'edit_product_details' pk=form.instance.pk %}{% else %}{% url 'add_product' store_id=store.pk %}{% endif %}">
