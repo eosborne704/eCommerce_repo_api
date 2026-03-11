@@ -118,6 +118,14 @@ STATIC_URL = 'static/'
 
 # Set login URL for login_required decorator
 LOGIN_URL = '/login/'
+
+# Django REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework_xml.renderers.XMLRenderer',
+    ],
+}
 STATIC_ROOT = BASE_DIR / 'static'
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

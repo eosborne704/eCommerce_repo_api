@@ -31,4 +31,12 @@ urlpatterns = [
     path('cart/', views.show_user_cart, name='show_user_cart'),
     path('cart/empty/', views.empty_cart, name='empty_cart'),
     path('cart/checkout/', views.checkout_view, name='checkout'),
+
+    # REST API endpoints
+    path('api/get/stores/', views.view_stores, name='api_view_stores'),
+    path('api/post/store/', views.add_store, name='api_add_store'),
+    path('api/get/products/', views.view_products, name='api_view_products'),
+    path('api/post/product/', views.add_product_api, name='api_add_product'),
+    path('api/get/reviews/', views.view_reviews, name='api_view_reviews'),
+    path('api/post/review/', views.add_review_api, name='api_add_review'),
 ]

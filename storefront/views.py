@@ -16,6 +16,68 @@ from django.utils import timezone
 from .models import Product, Store, Review, ResetToken, Purchase
 from .forms import ProductsForm, StoreForm, ReviewForm
 
+# REST Framework imports
+from rest_framework.decorators import api_view, renderer_classes, authentication_classes, permission_classes
+from rest_framework_xml.renderers import XMLRenderer
+from rest_framework.response import Response
+from rest_framework.authentication import BasicAuthentication
+from rest_framework.permissions import IsAuthenticated
+from .serializers import StoreSerializer, ProductSerializer, ReviewSerializer
+from django.http import JsonResponse
+from rest_framework import status
+
+# API Views
+@api_view(['GET'])
+@renderer_classes([XMLRenderer])
+def view_stores(request):
+    serializer = StoreSerializer(Store.objects.all(), many=True)
+    return Response(data=serializer.data)
+
+@api_view(['POST'])
+@authentication_classes([BasicAuthentication])
+@permission_classes([IsAuthenticated])
+def add_store(request):
+    if request.user.id == int(request.data.get('owner')):
+        serializer = StoreSerializer(data=request.data)
+        if serializer.is_valid():
+            store_obj = serializer.save()
+            # Tweet about new store (integration step)
+            return JsonResponse(data=serializer.data, status=status.HTTP_201_CREATED)
+        return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return JsonResponse({'ID mismatch': 'User ID and store ID not matching'}, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@renderer_classes([XMLRenderer])
+def view_products(request):
+    serializer = ProductSerializer(Product.objects.all(), many=True)
+    return Response(data=serializer.data)
+
+@api_view(['POST'])
+@authentication_classes([BasicAuthentication])
+@permission_classes([IsAuthenticated])
+def add_product_api(request):
+    serializer = ProductSerializer(data=request.data)
+    if serializer.is_valid():
+        product_obj = serializer.save()
+        # Tweet about new product (integration step)
+        return JsonResponse(data=serializer.data, status=status.HTTP_201_CREATED)
+    return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@renderer_classes([XMLRenderer])
+def view_reviews(request):
+    serializer = ReviewSerializer(Review.objects.all(), many=True)
+    return Response(data=serializer.data)
+
+@api_view(['POST'])
+@authentication_classes([BasicAuthentication])
+@permission_classes([IsAuthenticated])
+def add_review_api(request):
+    serializer = ReviewSerializer(data=request.data)
+    if serializer.is_valid():
+        review_obj = serializer.save()
+        return JsonResponse(data=serializer.data, status=status.HTTP_201_CREATED)
+    return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 @login_required
 def edit_product_details(request, pk):
     product = get_object_or_404(Product, pk=pk)
